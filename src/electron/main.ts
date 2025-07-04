@@ -40,10 +40,26 @@ app.on("ready", () => {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
             contextIsolation: true,
+            webSecurity:true,
+           
         },
     });
 
     pollClipboard(mainWindow);
+
+mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+        responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': [
+                "default-src 'self'; " +
+                "img-src 'self' data: blob:; " +  
+                "style-src 'self' 'unsafe-inline'; " +
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval';"
+            ]
+        }
+    });
+});
 
     if (isDev()) mainWindow.loadURL("http://localhost:3524")
     else mainWindow.loadFile(getUIPath());
@@ -99,49 +115,52 @@ app.on('window-all-closed', () => {
 });
 
 function pollClipboard(mainWindow: BrowserWindow) {
-    setInterval(() => {
-        const text = clipboard.readText();
-        if (text && text !== lastText) {
-            if (clipboardHistory.some(e => e.content === text)) {
-                let foundIndex = -1;
-                for (let i = 0; i < clipboardHistory.length; i++) {
-                    if (clipboardHistory[i].content === text) {
-                        foundIndex = i;
-                        break;
+    setInterval(() => { 
+        const text = clipboard.readText(); 
+        if (text && text !== lastText) { 
+            if (clipboardHistory.some(e => e.content === text)) { 
+                let foundIndex = -1; 
+                for (let i = 0; i < clipboardHistory.length; i++) { 
+                    if (clipboardHistory[i].content === text) { 
+                        foundIndex = i; 
+                        break; 
+                    } 
+                } 
+                clipboardHistory.splice(foundIndex, 1); 
+            } 
+            lastText = text; 
+            clipboardHistory.unshift({ format: 'text/plain', content: text }); 
+            mainWindow.webContents.send("clipboard-history-update", clipboardHistory); 
+        } 
+ 
+        const image = clipboard.readImage(); 
+        
+        if (!image.isEmpty()) {
+            const imageData = image.toDataURL(); 
+            const imageHash = crypto.createHash('sha256').update(imageData).digest('hex'); 
+            
+            if (imageHash !== lastImage) { 
+                lastImage = imageHash; 
+                let foundImageIndex = -1; 
+                for (let i = 0; i < clipboardHistory.length; i++) { 
+                    if (clipboardHistory[i].format === 'image/png') {
+                        const existingHash = crypto.createHash('sha256').update(clipboardHistory[i].content).digest('hex');
+                        if (existingHash === imageHash) {
+                            foundImageIndex = i; 
+                            break; 
+                        }
                     }
-                }
-                clipboardHistory.splice(foundIndex, 1);
+                } 
+                
+                if (foundImageIndex !== -1) { 
+                    clipboardHistory.splice(foundImageIndex, 1); 
+                } 
+                
+                clipboardHistory.unshift({ format: 'image/png', content: imageData }); 
+                mainWindow.webContents.send("clipboard-history-update", clipboardHistory); 
             }
-            lastText = text;
-            clipboardHistory.unshift({ format: 'text/plain', content: text });
-            mainWindow.webContents.send("clipboard-history-update", clipboardHistory);
         }
-
-        const image = clipboard.readImage();
-
-        const imageData = image.toDataURL();
-        console.log('image', imageData.slice(0, 100) + '...');
-
-        const imageHash = crypto.createHash('sha256').update(imageData).digest('hex');
-
-        if (!image.isEmpty() && imageHash !== lastImage) {
-            lastImage = imageHash;
-
-            let foundImageIndex = -1;
-            for (let i = 0; i < clipboardHistory.length; i++) {
-                if (clipboardHistory[i].content === imageData) { // Compare data URLs
-                    foundImageIndex = i;
-                    break;
-                }
-            }
-            if (foundImageIndex !== -1) {
-                clipboardHistory.splice(foundImageIndex, 1);
-            }
-
-            clipboardHistory.unshift({ format: 'image/png', content: imageData });
-            mainWindow.webContents.send("clipboard-history-update", clipboardHistory);
-        }
-
-        if (clipboardHistory.length > 50) clipboardHistory.pop();
-    }, 500);
+ 
+        if (clipboardHistory.length > 50) clipboardHistory.pop(); 
+    }, 500); 
 }

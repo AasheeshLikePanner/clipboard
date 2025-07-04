@@ -1,68 +1,56 @@
 import { useEffect, useState } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, FileImage } from 'lucide-react'
 import './App.css'
 
 function App() {
     const [clipboardHistory, setClipboardHistory] = useState<any[]>([]);
     const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+    const [imageErrors, setImageErrors] = useState<{[key: number]: string}>({});
 
     useEffect(() => {
         window.electron?.getClipboardHistory().then(history => {
             setClipboardHistory(history);
-            console.log("Initial clipboard history:", history);
-            
-            // Debug: Print image content details
+            console.log("=== CLIPBOARD HISTORY ===");
+            history.forEach((item:any, index) => {
+                console.log(`Item ${index}:`, {
+                    format: item.format,
+                    contentType: typeof item.content,
+                    contentLength: item.content?.length,
+                    isDataURL: item.content?.startsWith?.('data:'),
+                    mimeType: item.content?.substring?.(0, 50)
+                });
+            });
+        });
+
+        const unsubscribe = window.electron?.onClipboardHistoryUpdate(history => {
+            setClipboardHistory(history);
+            console.log("=== UPDATED HISTORY ===");
             history.forEach((item:any, index) => {
                 if (item.format !== 'text/plain') {
                     console.log(`Image ${index}:`, {
                         format: item.format,
                         contentType: typeof item.content,
                         contentLength: item.content?.length,
-                        contentPreview: item.content?.substring(0, 100),
-                        isBase64: item.content?.startsWith('data:'),
-                        isBuffer: item.content instanceof ArrayBuffer,
-                        isUint8Array: item.content instanceof Uint8Array
-                    });
-                }
-            });
-        });
-
-        const unsubscribe = window.electron?.onClipboardHistoryUpdate(history => {
-            setClipboardHistory(history);
-            console.log("Updated clipboard history:", history);
-            
-            // Debug: Print image content details for updates
-            history.forEach((item:any, index) => {
-                if (item.format !== 'text/plain') {
-                    console.log(`Updated Image ${index}:`, {
-                        format: item.format,
-                        contentType: typeof item.content,
-                        contentLength: item.content?.length,
-                        contentPreview: item.content?.substring(0, 100)
+                        startsWithData: item.content?.startsWith?.('data:'),
+                        preview: item.content?.substring?.(0, 100)
                     });
                 }
             });
         });
 
         return () => {
-            unsubscribe?.(); // Clean up the subscription on unmount
+            unsubscribe?.();
         };
     }, []);
 
     const handleCopyToClipboard = (content: string, index: number) => {
         navigator.clipboard.writeText(content);
         setCopiedIndex(index);
-        
-        // Reset the copied state after 1 second
-        setTimeout(() => {
-            setCopiedIndex(null);
-        }, 1000);
+        setTimeout(() => setCopiedIndex(null), 1000);
     };
 
     const handleImageCopy = (item: any, index: number) => {
-        // Try to copy image to clipboard if supported
         if (navigator.clipboard && navigator.clipboard.write) {
-            // For base64 images
             if (typeof item.content === 'string' && item.content.startsWith('data:')) {
                 const blob = dataURLToBlob(item.content);
                 navigator.clipboard.write([
@@ -89,16 +77,127 @@ function App() {
         return new Blob([u8arr], { type: mime });
     };
 
+    // Enhanced data URL validation
+    const validateDataURL = (dataURL: string): boolean => {
+        try {
+            // Check basic format
+            if (!dataURL.startsWith('data:')) {
+                console.log('❌ Not a data URL');
+                return false;
+            }
+
+            // Check if it has the comma separator
+            if (!dataURL.includes(',')) {
+                console.log('❌ No comma separator found');
+                return false;
+            }
+
+            const parts = dataURL.split(',');
+            if (parts.length !== 2) {
+                console.log('❌ Invalid data URL structure');
+                return false;
+            }
+
+            // Check if base64 part exists and is substantial
+            const base64Part = parts[1];
+            if (!base64Part || base64Part.length < 100) {
+                console.log('❌ Base64 part too short:', base64Part?.length);
+                return false;
+            }
+
+            // Try to decode base64 to validate
+            try {
+                atob(base64Part);
+                console.log('✅ Valid base64 encoding');
+                return true;
+            } catch (e) {
+                console.log('❌ Invalid base64 encoding:', e);
+                return false;
+            }
+        } catch (error) {
+            console.log('❌ Data URL validation error:', error);
+            return false;
+        }
+    };
+
     const getImageSrc = (item: any) => {
+        if (item.format === 'text/plain') {
+            return null;
+        }
+        
+        console.log('🔍 Processing image item:', {
+            format: item.format,
+            contentType: typeof item.content,
+            hasContent: !!item.content,
+            contentLength: item.content?.length,
+            contentStart: item.content?.substring?.(0, 50)
+        });
+        
         if (typeof item.content === 'string') {
             if (item.content.startsWith('data:')) {
-                return item.content;
+                console.log('🔍 Found data URL, validating...');
+                
+                // Enhanced validation
+                if (validateDataURL(item.content)) {
+                    console.log('✅ Valid data URL confirmed');
+                    return item.content;
+                } else {
+                    console.log('❌ Invalid data URL detected');
+                    setImageErrors(prev => ({
+                        ...prev,
+                        [item.index || Date.now()]: 'Invalid data URL format'
+                    }));
+                    return null;
+                }
             } else if (item.content.startsWith('http')) {
+                console.log('✅ Valid HTTP URL found');
                 return item.content;
+            } else {
+                console.log('❌ String content but no valid URL format');
+                console.log('Content preview:', item.content.substring(0, 100));
             }
         }
-        // If it's a buffer or other format, we might need to convert it
+        
+        if (item.content instanceof Uint8Array || item.content instanceof ArrayBuffer) {
+            console.log('✅ Binary data found, converting to blob URL');
+            try {
+                const blob = new Blob([item.content], { type: item.format || 'image/png' });
+                const blobUrl = URL.createObjectURL(blob);
+                console.log('✅ Blob URL created:', blobUrl);
+                return blobUrl;
+            } catch (error) {
+                console.log('❌ Failed to create blob URL:', error);
+                return null;
+            }
+        }
+        
+        console.log('❌ No valid image source found');
         return null;
+    };
+
+    const handleImageError = (index: number, error: any) => {
+        console.error(`❌ Image ${index} failed to load:`, error);
+        const item = clipboardHistory[index];
+        console.log('Failed item details:', {
+            format: item?.format,
+            contentType: typeof item?.content,
+            contentLength: item?.content?.length,
+            contentPreview: item?.content?.substring?.(0, 100)
+        });
+        
+        setImageErrors(prev => ({
+            ...prev,
+            [index]: 'Failed to load image'
+        }));
+    };
+
+    const handleImageLoad = (index: number) => {
+        console.log(`✅ Image ${index} loaded successfully`);
+        setImageErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[index];
+            return newErrors;
+        });
     };
 
     const handleWheel = (e: React.WheelEvent) => {
@@ -127,7 +226,9 @@ function App() {
                         onWheel={handleWheel}
                     >
                         {clipboardHistory.map((item, index) => {
-                            const imageSrc = getImageSrc(item);
+                            const imageSrc = item.format !== 'text/plain' ? getImageSrc(item) : null;
+                            const hasImageError = imageErrors[index];
+                            
                             return (
                                 <div 
                                     key={index}
@@ -154,21 +255,32 @@ function App() {
                                         </p>
                                     ) : (
                                         <div className='w-full h-full flex items-center justify-center'>
-                                            {imageSrc ? (
+                                            {imageSrc && !hasImageError ? (
                                                 <img 
                                                     src={imageSrc}
                                                     alt='Clipboard'
                                                     className='max-w-full max-h-full object-contain rounded-lg'
-                                                    onError={(e) => {
-                                                        console.error('Image failed to load:', item);
-                                                        e.currentTarget.style.display = 'none';
-                                                    }}
+                                                    onLoad={() => handleImageLoad(index)}
+                                                    onError={(e) => handleImageError(index, e)}
                                                 />
                                             ) : (
                                                 <div className='text-center'>
-                                                    <Copy className='w-4 h-4 text-gray-500 mx-auto mb-1' />
-                                                    <p className='text-gray-500 text-xs'>Image</p>
+                                                    <FileImage className='w-4 h-4 text-gray-500 mx-auto mb-1' />
+                                                    <p className='text-gray-500 text-xs'>
+                                                        {hasImageError ? 'Load Error' : 'Image'}
+                                                    </p>
                                                     <p className='text-gray-600 text-xs'>{item.format}</p>
+                                                    <p className='text-gray-600 text-xs mt-1'>
+                                                        {typeof item.content === 'string' ? 
+                                                            `${item.content.length} chars` : 
+                                                            typeof item.content
+                                                        }
+                                                    </p>
+                                                    {hasImageError && (
+                                                        <p className='text-red-400 text-xs mt-1'>
+                                                            {imageErrors[index]}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
