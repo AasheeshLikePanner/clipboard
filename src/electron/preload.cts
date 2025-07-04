@@ -5,7 +5,14 @@ electron.contextBridge.exposeInMainWorld("electron", {
         ipcOn("statistics", stats => {
             callback(stats);
         }),
-    getStaticData: () => ipcInvoke("getStaticData")
+    getStaticData: () => ipcInvoke("getStaticData"),    
+    getClipboardHistory: () => ipcInvoke('getClipboardHistory'),
+    onClipboardHistoryUpdate: (callback) =>
+        ipcOn("clipboard-history-update", history => {
+            callback(history);
+        }),
+
+    
 } satisfies Window['electron'])
 
 function ipcInvoke<Key extends keyof EventPayloadMapping>(key: Key): Promise<EventPayloadMapping[Key]> {
