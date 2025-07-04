@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { Tray, Menu } from 'electron';
+import crypto from 'crypto'
 
 
 let tray: Tray | null = null;
@@ -55,7 +56,7 @@ app.on("ready", () => {
 
     ipcMain.handle("getClipboardHistory", () => {
         console.log(clipboardHistory);
-        
+
         return clipboardHistory;
     });
 
@@ -100,17 +101,43 @@ app.on('window-all-closed', () => {
 function pollClipboard(mainWindow: BrowserWindow) {
     setInterval(() => {
         const text = clipboard.readText();
-        
         if (text && text !== lastText) {
+            if (clipboardHistory.some(e => e.content === text)) {
+                let foundIndex = -1;
+                for (let i = 0; i < clipboardHistory.length; i++) {
+                    if (clipboardHistory[i].content === text) {
+                        foundIndex = i;
+                        break;
+                    }
+                }
+                clipboardHistory.splice(foundIndex, 1);
+            }
             lastText = text;
             clipboardHistory.unshift({ format: 'text/plain', content: text });
             mainWindow.webContents.send("clipboard-history-update", clipboardHistory);
         }
 
         const image = clipboard.readImage();
+
         const imageData = image.toDataURL();
-        if (image && imageData && imageData !== lastImage) {
-            lastImage = imageData;
+        console.log('image', imageData.slice(0, 100) + '...');
+
+        const imageHash = crypto.createHash('sha256').update(imageData).digest('hex');
+
+        if (!image.isEmpty() && imageHash !== lastImage) {
+            lastImage = imageHash;
+
+            let foundImageIndex = -1;
+            for (let i = 0; i < clipboardHistory.length; i++) {
+                if (clipboardHistory[i].content === imageData) { // Compare data URLs
+                    foundImageIndex = i;
+                    break;
+                }
+            }
+            if (foundImageIndex !== -1) {
+                clipboardHistory.splice(foundImageIndex, 1);
+            }
+
             clipboardHistory.unshift({ format: 'image/png', content: imageData });
             mainWindow.webContents.send("clipboard-history-update", clipboardHistory);
         }
