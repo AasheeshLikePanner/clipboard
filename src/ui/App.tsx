@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Copy, Check, FileImage, X, Command } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { Copy, Check, FileImage } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -116,11 +116,41 @@ function App() {
         });
     };
 
+    const scrollAnimationRef = React.useRef<number | null>(null);
+
     const handleWheel = (e: React.WheelEvent) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            e.currentTarget.scrollLeft += e.deltaY;
+        if (e.deltaY === 0) return;
+
+        e.preventDefault();
+
+        const scrollContainer = e.currentTarget;
+        const startScrollLeft = scrollContainer.scrollLeft;
+        const targetScrollLeft = startScrollLeft + e.deltaY;
+        const duration = 600; // milliseconds, increased for slower scroll
+        let startTime: number | null = null;
+
+        if (scrollAnimationRef.current) {
+            cancelAnimationFrame(scrollAnimationRef.current);
         }
+
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3); // Ease-out cubic function
+
+        const animateScroll = (currentTime: number) => {
+            if (!startTime) startTime = currentTime;
+            const elapsedTime = currentTime - startTime;
+            let progress = Math.min(elapsedTime / duration, 1);
+            progress = easeOutCubic(progress); // Apply easing function
+
+            scrollContainer.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * progress;
+
+            if (elapsedTime < duration) {
+                scrollAnimationRef.current = requestAnimationFrame(animateScroll);
+            } else {
+                scrollAnimationRef.current = null;
+            }
+        };
+
+        scrollAnimationRef.current = requestAnimationFrame(animateScroll);
     };
 
     const truncateText = (text: string, maxLength: number = 80) => {
@@ -128,11 +158,11 @@ function App() {
     };
 
     return (
-        <div className='h-[150px] ps-3  bg-[#131313] text-white overflow-hidden flex flex-col font-sans rounded-b-3xl'>
+        <div className='h-[150px] ps-3  bg-[#131313] text-white overflow-hidden flex flex-col font-sans rounded-b-[40px]'>
             <main className='flex-grow h-full flex items-center justify-center px-4'>
                 {clipboardHistory.length === 0 ? (
                     <div className='flex flex-col items-center justify-center opacity-40 fade-in'>
-                        <img src="public/icon.png" draggable={false} alt="NotchClip Logo" className="user-drag-none select-none w-10 h-10 mb-2" />
+                        <img src="icon.png" draggable={false} alt="NotchClip Logo" className="user-drag-none select-none w-10 h-10 mb-2" />
                          <p className='text-gray-400 text-sm font-semibold'>NotchClip</p>
                         <p className='text-gray-500 text-xs mt-1'>Your clipboard history is empty.</p>
                     </div>
