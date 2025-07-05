@@ -128,11 +128,11 @@ function App() {
     };
 
     return (
-        <div className='h-[150px] ps-3  bg-[#131313] text-white overflow-hidden flex flex-col font-sans'>
+        <div className='h-[150px] ps-3  bg-[#131313] text-white overflow-hidden flex flex-col font-sans rounded-b-3xl'>
             <main className='flex-grow h-full flex items-center justify-center px-4'>
                 {clipboardHistory.length === 0 ? (
                     <div className='flex flex-col items-center justify-center opacity-40 fade-in'>
-                        <img src="/logo.png" alt="NotchClip Logo" className="w-10 h-10 mb-2" />
+                        <img src="public/icon.png" draggable={false} alt="NotchClip Logo" className="user-drag-none select-none w-10 h-10 mb-2" />
                          <p className='text-gray-400 text-sm font-semibold'>NotchClip</p>
                         <p className='text-gray-500 text-xs mt-1'>Your clipboard history is empty.</p>
                     </div>

@@ -24,16 +24,16 @@ app.on("ready", () => {
     const windowHeight = 150;
     const x = Math.round((screenWidth - windowWidth) / 2) + displayX;
     
-    let y;
-    const platform = os.platform();
+    let y = displayY;
+    // const platform = os.platform();
     
-    if (platform === 'win32') {
-        y = displayY; 
-    } else if (platform === 'darwin') {
-        y = displayY + 35;
-    } else {
-        y = displayY + 10;
-    }
+    // if (platform === 'win32') {
+    //     y = displayY; 
+    // } else if (platform === 'darwin') {
+    //     y = displayY;
+    // } else {
+    //     y = displayY;
+    // }
     
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
@@ -76,87 +76,6 @@ app.on("ready", () => {
 
     if (isDev()) {
         mainWindow.loadURL("http://localhost:3524")
-        mainWindow.webContents.once('did-finish-load', () => {
-            mainWindow.webContents.insertCSS(`
-                body {
-                    -webkit-app-region: drag;
-                    background: transparent !important;
-                    margin: 0;
-                    padding: 0;
-                    overflow: hidden;
-                }
-                
-                #root {
-                    width: 100%;
-                    height: 100vh;
-                    background: linear-gradient(135deg, 
-                        rgba(255, 255, 255, 0.95) 0%, 
-                        rgba(255, 255, 255, 0.85) 100%);
-                    backdrop-filter: blur(20px);
-                    -webkit-backdrop-filter: blur(20px);
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                    box-shadow: 
-                        0 8px 32px rgba(0, 0, 0, 0.12),
-                        0 2px 8px rgba(0, 0, 0, 0.08),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.5);
-                    border-radius: 0 0 20px 20px;
-                    position: relative;
-                    overflow: hidden;
-                    -webkit-app-region: no-drag;
-                }
-                
-                #root::before,
-                #root::after {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    width: 20px;
-                    height: 20px;
-                    background: transparent;
-                    border-radius: 0 0 20px 0;
-                    box-shadow: 0 0 0 20px rgba(255, 255, 255, 0.95);
-                    z-index: -1;
-                }
-                
-                #root::before {
-                    left: -20px;
-                    transform: rotate(90deg);
-                }
-                
-                #root::after {
-                    right: -20px;
-                    transform: rotate(180deg);
-                }
-                
-                @media (prefers-color-scheme: dark) {
-                    #root {
-                        background: linear-gradient(135deg, 
-                            rgba(30, 30, 30, 0.95) 0%, 
-                            rgba(20, 20, 20, 0.85) 100%);
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        box-shadow: 
-                            0 8px 32px rgba(0, 0, 0, 0.3),
-                            0 2px 8px rgba(0, 0, 0, 0.2),
-                            inset 0 1px 0 rgba(255, 255, 255, 0.1);
-                        color: white;
-                    }
-                    
-                    #root::before,
-                    #root::after {
-                        box-shadow: 0 0 0 20px rgba(30, 30, 30, 0.95);
-                    }
-                }
-                
-                #root:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 
-                        0 12px 48px rgba(0, 0, 0, 0.15),
-                        0 4px 12px rgba(0, 0, 0, 0.1),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.6);
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                }
-            `);
-        });
     } else {
         mainWindow.loadFile(getUIPath());
     }
