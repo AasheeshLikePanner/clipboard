@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { Tray, Menu } from 'electron';
 import crypto from 'crypto'
-  import os from 'os';
+import os from 'os';
 
 let tray: Tray | null = null;
 let clipboardHistory: { format: string; content: string }[] = [];
@@ -19,14 +19,14 @@ app.on("ready", () => {
 
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
     const { x: displayX, y: displayY } = screen.getPrimaryDisplay().workArea;
-    
+
     const windowWidth = 1000;
     const windowHeight = 150;
     const x = Math.round((screenWidth - windowWidth) / 2) + displayX;
-    
+
     let y = displayY;
     // const platform = os.platform();
-    
+
     // if (platform === 'win32') {
     //     y = displayY; 
     // } else if (platform === 'darwin') {
@@ -34,7 +34,7 @@ app.on("ready", () => {
     // } else {
     //     y = displayY;
     // }
-    
+
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
 
@@ -50,6 +50,9 @@ app.on("ready", () => {
         alwaysOnTop: true,
         skipTaskbar: true,
         hasShadow: true, // Enhanced shadow for better depth
+        opacity: 0,        // <-- start hidden
+        show: false,       // <-- don’t auto-show (we’ll show manually)
+
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
@@ -66,7 +69,7 @@ app.on("ready", () => {
                 ...details.responseHeaders,
                 'Content-Security-Policy': [
                     "default-src 'self'; " +
-                    "img-src 'self' data: blob:; " +  
+                    "img-src 'self' data: blob:; " +
                     "style-src 'self' 'unsafe-inline'; " +
                     "script-src 'self' 'unsafe-inline' 'unsafe-eval';"
                 ]
@@ -119,10 +122,27 @@ app.on("ready", () => {
         ]);
         tray.setToolTip('Clipboard App');
         tray.setContextMenu(contextMenu);
+
         globalShortcut.register('CommandOrControl+Shift+V', () => {
-            mainWindow?.show();
-            mainWindow?.focus();
+            if (!mainWindow.isVisible()) {
+                mainWindow.setOpacity(0);
+                mainWindow.showInactive(); // show without stealing focus
+
+                let opacity = 0;
+                const interval = setInterval(() => {
+                    opacity += 0.05;
+                    mainWindow.setOpacity(opacity);
+                    if (opacity >= 1) {
+                        clearInterval(interval);
+                        mainWindow.focus(); // focus after fade-in
+                    }
+                }, 0.2); // ~60fps
+            } else {
+                mainWindow.hide(); // Toggle off if already visible
+            }
+
         });
+
     });
 })
 
