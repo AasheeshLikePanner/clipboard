@@ -31,13 +31,13 @@ function App() {
         };
     }, []);
 
-    const handleCopyToClipboard = (content: string, index: number) => {
+    const handleCopyToClipboard = (content: string) => {
         navigator.clipboard.writeText(content);
         setCopiedContent(content);
         setTimeout(() => setCopiedContent(null), 1200);
     };
 
-    const handleImageCopy = (item: any, index: number) => {
+    const handleImageCopy = (item: any) => {
         if (navigator.clipboard && navigator.clipboard.write) {
             if (typeof item.content === 'string' && item.content.startsWith('data:')) {
                 const blob = dataURLToBlob(item.content);
@@ -162,7 +162,7 @@ function App() {
             <main className='flex-grow h-full flex items-center justify-center px-4'>
                 {clipboardHistory.length === 0 ? (
                     <div className='flex flex-col items-center justify-center opacity-40 fade-in'>
-                        <img src="icon.png" draggable={false} alt="NotchClip Logo" className="user-drag-none select-none w-10 h-10 mb-2" />
+                        {/* Application Icon Placeholder */}
                          <p className='text-gray-400 text-sm font-semibold'>NotchClip</p>
                         <p className='text-gray-500 text-xs mt-1'>Your clipboard history is empty.</p>
                     </div>
@@ -181,9 +181,9 @@ function App() {
                                     className='clipboard-item group flex-none w-44 h-32 bg-[#1e1e1e] rounded-xl flex items-center justify-center p-3 transition-all duration-300 ease-in-out hover:bg-[#252525] hover:scale-105 cursor-pointer relative overflow-hidden'
                                     onClick={() => {
                                         if (item.format === 'text/plain') {
-                                            handleCopyToClipboard(item.content, index);
+                                            handleCopyToClipboard(item.content);
                                         } else if (imageSrc && !hasImageError) {
-                                            handleImageCopy(item, index);
+                                            handleImageCopy(item);
                                         }
                                     }}
                                 >
@@ -195,9 +195,9 @@ function App() {
                                         onClick={e => {
                                             e.stopPropagation();
                                             if (item.format === 'text/plain') {
-                                                handleCopyToClipboard(item.content, index);
+                                                handleCopyToClipboard(item.content);
                                             } else if (imageSrc && !hasImageError) {
-                                                handleImageCopy(item, index);
+                                                handleImageCopy(item);
                                             }
                                         }}
                                         aria-label="Copy"

@@ -10,10 +10,21 @@ import { Tray, Menu } from 'electron';
 import crypto from 'crypto'
 import os from 'os';
 
+app.disableHardwareAcceleration();
+
 let tray: Tray | null = null;
 let clipboardHistory: { format: string; content: string }[] = [];
 let lastText = '';
 let lastImage = '';
+
+if (!app.requestSingleInstanceLock()) {
+    console.log("Another instance is already running. Quitting this instance.");
+    app.quit();
+    process.exit(0);
+} else {
+    console.log("Single instance lock acquired.");
+}
+
 
 app.on("ready", () => {
 
@@ -58,6 +69,7 @@ app.on("ready", () => {
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: true,
+            devTools: true, // Enable DevTools in production for debugging
         },
     });
 
@@ -94,6 +106,7 @@ app.on("ready", () => {
         return clipboardHistory;
     });
 
+
     // Add IPC handler for platform detection
     ipcMain.handle("getPlatform", () => {
         return os.platform();
@@ -115,7 +128,14 @@ app.on("ready", () => {
     });
 
     app.whenReady().then(() => {
-        tray = new Tray('public/icon.png');
+        const iconPath = app.isPackaged
+            ? path.join(process.resourcesPath, "icon.png")
+            : path.join(__dirname, "..", "icon.png");
+
+        tray = new Tray(iconPath);
+
+
+        console.log("Tray icon path:", path.join(app.getAppPath(), "icon.png"));
         const contextMenu = Menu.buildFromTemplate([
             { label: 'Show App', click: () => mainWindow?.show() },
             { label: 'Quit', click: () => app.quit() }
@@ -124,24 +144,18 @@ app.on("ready", () => {
         tray.setContextMenu(contextMenu);
 
         globalShortcut.register('CommandOrControl+Shift+V', () => {
-            if (!mainWindow.isVisible()) {
-                mainWindow.setOpacity(0);
-                mainWindow.showInactive(); // show without stealing focus
+            console.log("Shortcut triggered. Window visible?", mainWindow.isVisible());
 
-                let opacity = 0;
-                const interval = setInterval(() => {
-                    opacity += 0.05;
-                    mainWindow.setOpacity(opacity);
-                    if (opacity >= 1) {
-                        clearInterval(interval);
-                        mainWindow.focus(); // focus after fade-in
-                    }
-                }, 0.2); // ~60fps
+            if (mainWindow.isVisible()) {
+                mainWindow.hide();
             } else {
-                mainWindow.hide(); // Toggle off if already visible
+                console.log("Attempting to show window.");
+                mainWindow.show();
+                mainWindow.focus();
+                mainWindow.setAlwaysOnTop(true); // Linux sometimes loses focus without this
             }
-
         });
+
 
     });
 })

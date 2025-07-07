@@ -5,9 +5,13 @@
         "dist-react"
     ],
     "extraResources": [
-        "dist-electron/preload.cjs"
+        "dist-electron/preload.cjs",
+        {
+            "from": "icon.png",
+            "to": "icon.png"
+        }
     ],
-    "icon": "./templateIcon.png",
+    "icon": "icon.png",
     "mac": {
         "target": "dmg"
     },
