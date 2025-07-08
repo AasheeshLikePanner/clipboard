@@ -11,7 +11,7 @@ function App() {
         // Mock data for development in browser
         if (!window.electron) {
             setClipboardHistory([
-                { format: 'text/plain', content: 'Hello from NotchClip! This is a test item.' },
+                { format: 'text/plain', content: 'Hello from Notch Clipboard! This is a test item.' },
                 { format: 'image/png', content: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' }, // 1x1 red pixel
                 { format: 'text/plain', content: 'Press Ctrl+Shift+V to open and Ctrl+W to close.' },
                 { format: 'image/png', content: 'invalid-data-url' },
@@ -163,7 +163,7 @@ function App() {
                 {clipboardHistory.length === 0 ? (
                     <div className='flex flex-col items-center justify-center opacity-40 fade-in'>
                         {/* Application Icon Placeholder */}
-                         <p className='text-gray-400 text-sm font-semibold'>NotchClip</p>
+                         <p className='text-gray-400 text-sm font-semibold'>Notch Clipboard</p>
                         <p className='text-gray-500 text-xs mt-1'>Your clipboard history is empty.</p>
                     </div>
                 ) : (

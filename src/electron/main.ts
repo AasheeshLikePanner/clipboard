@@ -9,24 +9,7 @@ import { dirname } from 'path';
 import { Tray, Menu } from 'electron';
 import crypto from 'crypto';
 import os from 'os'
-
-// Debug setup
-const debug = {
-  logWindowState: (win: BrowserWindow) => {
-    console.log('--- Window State ---');
-    console.log('Visible:', win.isVisible());
-    console.log('Focused:', win.isFocused());
-    console.log('Minimized:', win.isMinimized());
-    console.log('Opacity:', win.getOpacity());
-    console.log('AlwaysOnTop:', win.isAlwaysOnTop());
-    console.log('-------------------');
-  },
-  logShortcutInfo: () => {
-    console.log('--- Shortcut Info ---');
-    console.log('Registered:', globalShortcut.isRegistered('CommandOrControl+Shift+V'));
-    console.log('-------------------');
-  }
-};
+import Store, {Schema} from 'electron-store'
 
 app.disableHardwareAcceleration();
 
@@ -36,14 +19,28 @@ let lastText = '';
 let lastImage = '';
 let allowHide = true; // Control window hiding behavior
 
+interface AppConfig {
+  startAtLogin: boolean;
+}
+
+const schema: Schema<AppConfig> = {
+  startAtLogin: {
+    type: 'boolean',
+    default: true
+  }
+};
+
+const config = new Store<AppConfig>({ schema });
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
 }
 
+let appIsQuitting = false;
+
 app.on("ready", () => {
-  console.log('--- App Ready ---');
-  
+
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
   const { x: displayX, y: displayY } = screen.getPrimaryDisplay().workArea;
 
@@ -55,7 +52,6 @@ app.on("ready", () => {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
 
-  console.log('Creating main window...');
   const mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -81,35 +77,34 @@ app.on("ready", () => {
 
   // Debug event listeners
   mainWindow.on('show', () => {
-    console.log('Window show event triggered');
-    debug.logWindowState(mainWindow);
+
   });
 
   mainWindow.on('hide', () => {
-    console.log('Window hide event triggered');
-    debug.logWindowState(mainWindow);
+
   });
 
   mainWindow.on('focus', () => {
-    console.log('Window focus event triggered');
-    debug.logWindowState(mainWindow);
+
+  });
+
+  mainWindow.on('close', (event) => {
+    if (!appIsQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
   });
 
   mainWindow.on('blur', () => {
-    console.log('Window blur event triggered');
     if (allowHide && !mainWindow.webContents.isDevToolsOpened()) {
-      console.log('Hiding window due to blur');
       mainWindow.hide();
     }
   });
 
   mainWindow.on('ready-to-show', () => {
-    console.log('Window ready-to-show event triggered');
-    debug.logWindowState(mainWindow);
   });
 
   // Load the app
-  console.log('Loading app content...');
   if (isDev()) {
     mainWindow.loadURL("http://localhost:3524")
       .then(() => console.log('Dev URL loaded successfully'))
@@ -121,68 +116,79 @@ app.on("ready", () => {
   }
 
   // Initialize tray
-  console.log('Initializing tray...');
   const iconPath = app.isPackaged
     ? path.join(process.resourcesPath, "icon.png")
     : path.join(__dirname, "..", "icon.png");
 
   tray = new Tray(iconPath);
+
+  app.setLoginItemSettings({
+    openAtLogin: config.get('startAtLogin'),
+    openAsHidden: true,  // Starts minimized/hidden
+    path: process.execPath,
+    args: [
+      '--hidden'  // Custom argument you can check in your app
+    ]
+  });
+
+
   const contextMenu = Menu.buildFromTemplate([
-    { 
-      label: 'Show App', 
-      click: () => {
-        console.log('Tray "Show App" clicked');
-        allowHide = false;
-        mainWindow.show();
-        mainWindow.focus();
-        setTimeout(() => allowHide = true, 100);
-      } 
+    {
+      label: 'Start at Login',
+      type: 'checkbox',
+      checked: config.get('startAtLogin'),
+      click: ({checked}) => {
+        config.get('startAtLogin', checked)
+        app.setLoginItemSettings({
+          openAtLogin: checked,
+          openAsHidden: true,
+          path: process.execPath
+        });
+      }
     },
-    { label: 'Open DevTools', click: () => mainWindow.webContents.openDevTools() },
-    { label: 'Debug Info', click: () => debug.logWindowState(mainWindow) },
-    { label: 'Quit', click: () => app.quit() }
+    { label: 'Show App', click: () => mainWindow?.show() },
+    {
+      label: 'Quit',
+      click: () => {
+        appIsQuitting = true;
+        globalShortcut.unregisterAll();
+        if (tray) tray.destroy();
+        mainWindow.destroy()
+        app.quit();
+      }
+    }
   ]);
+  tray.setToolTip('Clipboard App');
+  tray.setContextMenu(contextMenu);
   tray.setToolTip('Clipboard App');
   tray.setContextMenu(contextMenu);
 
   // Register global shortcut
-  console.log('Registering global shortcut...');
   const shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+V', () => {
-    console.log('\nShortcut triggered');
-    debug.logWindowState(mainWindow);
-    debug.logShortcutInfo();
 
     if (mainWindow.isVisible()) {
-      console.log('Hiding window');
       mainWindow.hide();
     } else {
-      console.log('Showing window');
       allowHide = false;
       mainWindow.show();
       mainWindow.focus();
-      
+
       // Windows-specific fixes
       if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
         setTimeout(() => mainWindow.focus(), 100);
       }
-      
+
       setTimeout(() => allowHide = true, 100);
     }
   });
 
-  if (!shortcutRegistered) {
-    console.error('Failed to register shortcut');
-  } else {
-    console.log('Shortcut registered successfully');
-    debug.logShortcutInfo();
-  }
+
 
   // IPC and other handlers
   ipcMainHandle("getStaticData", () => getStaticData());
-  
+
   ipcMain.handle("getClipboardHistory", () => {
-    console.log('Clipboard history requested');
     return clipboardHistory;
   });
 
@@ -212,7 +218,6 @@ app.on("ready", () => {
     if (clipboardHistory.length > 50) clipboardHistory.pop();
   }, 500);
 
-  console.log('App initialization complete');
 });
 
 app.on('window-all-closed', () => {

@@ -1,5 +1,5 @@
 {
-	"name": "NotchClip",
+	"name": "notch-clipboard",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
@@ -21,6 +21,7 @@
 		"@tailwindcss/vite": "^4.0.6",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
+		"electron-store": "^10.1.0",
 		"lucide-react": "^0.475.0",
 		"os-utils": "^0.0.14",
 		"react": "^19.0.0",
